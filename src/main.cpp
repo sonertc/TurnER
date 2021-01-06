@@ -55,7 +55,7 @@ const char index_html[] PROGMEM = R"rawliteral(
   </style>
 </head>
 <body>
-  <h2>Turn Table Control</h2>
+  <h2>Turn Table Controller</h2>
   %BUTTONPLACEHOLDER%
 <script>function toggleCheckbox(element) {
   var xhr = new XMLHttpRequest();
