@@ -8,8 +8,8 @@
 #include <WiFiUdp.h>
 
 // Replace with your network credentials
-const char* ssid = "TP-Link_235C";
-const char* password = "12345678";
+const char* ssid = "ALBUM34";
+const char* password = "album345109100";
 
 String relayState(int i);
 
