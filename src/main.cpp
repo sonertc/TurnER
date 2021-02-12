@@ -6,183 +6,209 @@
 #include <ArduinoOTA.h>
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
-
 // Replace with your network credentials
-const char* ssid = "ALBUM34";
-const char* password = "album345109100";
+const char* ssid = "BASAK"; // Input your wifi network name
+const char* password = "09052011"; // Input your wifi password
 
-String relayState(int i);
-
-IPAddress ip(192, 168, 1, 102);
+IPAddress ip(192, 168, 1, 103);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 
+// Set web server port number to 3000
+WiFiServer server(80);
+
+// Variable to store the HTTP request
+String header;
+
+// Auxiliar variables to store the current output state
+String calState = "off";
+String relay2State = "off";
+String cwState = "off";
+String ccwState = "off";
 
 
-// setting Relay properties
+// Assign output variables to GPIO pins
+const int cal = 02; // GPIO5 
+//const int relay2 = 02; // GPIO4 
+const int cw = 15; // GPIO4 
+const int ccw = 02; // GPIO4 
 
-// Set to true to define Relay as Normally Open (NO)
-#define RELAY_NO    true
+void setup() {
+  Serial.begin(115200);
+  // Initialize the output variables as outputs
+  //pinMode(cal, OUTPUT);
+  //pinMode(relay2, OUTPUT);
+  pinMode(cw, OUTPUT);
+  pinMode(ccw, OUTPUT);
 
-// Set number of relays
-#define NUM_RELAYS  2
+  // Set outputs to HIGH. relay active LOW
+  //digitalWrite(cal, HIGH);
+  //digitalWrite(relay2, HIGH);
+  digitalWrite(cw, HIGH);
+  digitalWrite(ccw, HIGH);
 
-// Assign each GPIO to a relay
-int relayGPIOs[NUM_RELAYS] = {2, 26};
-
-const char* PARAM_INPUT_1 = "relay";  
-const char* PARAM_INPUT_2 = "state";
-
-
-
-AsyncWebServer server(3000);
-
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    html {font-family: Arial; display: inline-block; text-align: center;}
-    h2 {font-size: 3.0rem;}
-    p {font-size: 3.0rem;}
-    body {max-width: 600px; margin:0px auto; padding-bottom: 25px;}
-    .switch {position: relative; display: inline-block; width: 120px; height: 68px} 
-    .switch input {display: none}
-    .slider {position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 34px}
-    .slider:before {position: absolute; content: ""; height: 52px; width: 52px; left: 8px; bottom: 8px; background-color: #fff; -webkit-transition: .4s; transition: .4s; border-radius: 68px}
-    input:checked+.slider {background-color: #2196F3}
-    input:checked+.slider:before {-webkit-transform: translateX(52px); -ms-transform: translateX(52px); transform: translateX(52px)}
-  </style>
-</head>
-<body>
-  <h2>Turn Table Controller</h2>
-  %BUTTONPLACEHOLDER%
-<script>function toggleCheckbox(element) {
-  var xhr = new XMLHttpRequest();
-  if(element.checked){ xhr.open("GET", "/update?relay="+element.id+"&state=1", true); }
-  else { xhr.open("GET", "/update?relay="+element.id+"&state=0", true); }
-  xhr.send();
-}</script>
-</body>
-</html>
-)rawliteral";
-
-
-// Replaces placeholder with button section in your web page
-String processor(const String& var){
-  //Serial.println(var);
-  if(var == "BUTTONPLACEHOLDER"){
-    String buttons ="";
-    for(int i=1; i<=NUM_RELAYS; i++){
-      String relayStateValue = relayState(i);
-      buttons+= "<h4>Relay #" + String(i) + " - GPIO " + relayGPIOs[i-1] + "</h4><label class=\"switch\"><input type=\"checkbox\" onchange=\"toggleCheckbox(this)\" id=\"" + String(i) + "\" "+ relayStateValue +"><span class=\"slider\"></span></label>";
-    }
-    return buttons;
-  }
-  return String();
-}
-
-String relayState(int numRelay){
-  if(RELAY_NO){
-    if(digitalRead(relayGPIOs[numRelay-1])){
-      return "";
-    }
-    else {
-      return "checked";
-    }
-  }
-  else {
-    if(digitalRead(relayGPIOs[numRelay-1])){
-      return "checked";
-    }
-    else {
-      return "";
-    }
-  }
-  return "";
-}
-
-void setup()
-{
-	// Serial port for debugging purposes
-	Serial.begin(115200);
-
-  // Set all relays to off when the program starts - if set to Normally Open (NO), the relay is off when you set the relay to HIGH
-  for(int i=1; i<=NUM_RELAYS; i++){
-    pinMode(relayGPIOs[i-1], OUTPUT);
-    if(RELAY_NO){
-      digitalWrite(relayGPIOs[i-1], HIGH);
-    }
-    else{
-      digitalWrite(relayGPIOs[i-1], LOW);
-    }
-  }
-
-	// Connect to Wi-Fi
-	WiFi.mode(WIFI_STA);
+  // Connect to Wi-Fi network with SSID and password
+  Serial.print("Connecting to ");
+  //WiFi.mode(WIFI_STA);
 	WiFi.config(ip, gateway, subnet);
-	WiFi.begin(ssid, password);
-
-	while (WiFi.status() != WL_CONNECTED)
-	{
-		delay(1000);
-		Serial.println("Connecting to WiFi..");
-	}
-
-	// Print ESP Local IP Address
-	
-	Serial.println("Connected");
-	Serial.println(WiFi.localIP());
-
-	// Route for root / web page
-	server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-		request->send_P(200, "text/html", index_html, processor);
-	});
-
- // Send a GET request to <ESP_IP>/update?relay=<inputMessage>&state=<inputMessage2>
-  server.on("/update", HTTP_GET, [] (AsyncWebServerRequest *request) {
-    String inputMessage;
-    String inputParam;
-    String inputMessage2;
-    String inputParam2;
-    // GET input1 value on <ESP_IP>/update?relay=<inputMessage>
-    if (request->hasParam(PARAM_INPUT_1) & request->hasParam(PARAM_INPUT_2)) {
-      inputMessage = request->getParam(PARAM_INPUT_1)->value();
-      inputParam = PARAM_INPUT_1;
-      inputMessage2 = request->getParam(PARAM_INPUT_2)->value();
-      inputParam2 = PARAM_INPUT_2;
-      if(RELAY_NO){
-        Serial.print("NO ");
-        digitalWrite(relayGPIOs[inputMessage.toInt()-1], !inputMessage2.toInt());
-      }
-      else{
-        Serial.print("NC ");
-        digitalWrite(relayGPIOs[inputMessage.toInt()-1], inputMessage2.toInt());
-      }
-    }
-    else {
-      inputMessage = "No message sent";
-      inputParam = "none";
-    }
-    Serial.println(inputMessage + inputMessage2);
-    request->send(200, "text/plain", "OK");
-  });
-
-	// Start server
-	server.begin();
-
-	ArduinoOTA
-		.onStart([]() {
-			String type;
-			if (ArduinoOTA.getCommand() == U_FLASH)
-				type = "sketch";
-			else // U_SPIFFS
-				type = "filesystem";
-		});
-	ArduinoOTA.begin();
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  // Print local IP address and start web server
+  Serial.println("");
+  Serial.println("WiFi connected.");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  server.begin();
 }
 
-void loop()
-{
-	ArduinoOTA.handle();
+void loop() {
+  WiFiClient client = server.available();   // Listen for incoming clients
+
+  if (client) {                             // If a new client connects,
+    Serial.println("New Client.");          // print a message out in the serial port
+    String currentLine = "";                // make a String to hold incoming data from the client
+    while (client.connected()) {            // loop while the client's connected
+      if (client.available()) {             // if there's bytes to read from the client,
+        char c = client.read();             // read a byte, then
+        Serial.write(c);                    // print it out the serial monitor
+        header += c;
+        if (c == '\n') {                    // if the byte is a newline character
+          // if the current line is blank, you got two newline characters in a row.
+          // that's the end of the client HTTP request, so send a response:
+          if (currentLine.length() == 0) {
+            // HTTP headers always start with a response code (e.g. HTTP/1.1 200 OK)
+            // and a content-type so the client knows what's coming, then a blank line:
+            client.println("HTTP/1.1 200 OK");
+            client.println("Content-type:text/html");
+            client.println("Connection: close");
+            client.println();
+
+            // turns the GPIOs on and off
+            
+            
+            if (header.indexOf("GET /0/on") >= 0) // CW ON
+            {
+              Serial.println("GPIO 0 on");
+              cwState = "on";
+              digitalWrite(cw, LOW);
+              ccwState = "off";
+              calState = "off";
+              digitalWrite(ccw, HIGH);
+              
+              
+            }
+            else if (header.indexOf("GET /0/off") >= 0) // CW OFF
+            {
+              Serial.println("GPIO 0 off");
+              cwState = "off";
+              digitalWrite(cw, HIGH);
+            }
+            else if (header.indexOf("GET /2/on") >= 0) { // CCW ON
+              Serial.println("GPIO 2 on");
+              ccwState = "on";
+              digitalWrite(ccw, LOW);
+              cwState = "off";
+              calState = "off";
+              digitalWrite(cw, HIGH);
+              
+            }
+            else if (header.indexOf("GET /2/off") >= 0) { // CCW OFF
+              Serial.println("GPIO 2 off");
+              ccwState = "off";
+              digitalWrite(ccw, HIGH);
+            }
+            else if (header.indexOf("GET /5/on") >= 0) { // CALIBRATE ON
+              Serial.println("GPIO 5 on");
+              calState= "on";
+              digitalWrite(ccw, LOW);
+              cwState = "off";
+              ccwState = "off";
+              digitalWrite(cw, HIGH);
+              
+             
+            }
+            else if (header.indexOf("GET /5/off") >= 0) { // CALIBRATE OFF
+              Serial.println("GPIO 5 off");
+              calState = "off";
+              digitalWrite(ccw, HIGH);
+            }
+
+            // Display the HTML web page
+            client.println("<!DOCTYPE html><html>");
+            client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+            //client.println("<link rel=\"icon\" href=\"data:,\">");
+            // CSS to style the on/off buttons
+            // Feel free to change the background-color and font-size attributes to fit your preferences
+            client.println("<style>html, body { font-family: Helvetica; display: block; margin: 0px auto; text-align: center;}");
+            client.println(".button { background-color: #209e48; border: none; color: white; padding: 12px 24px;");
+            client.println("text-decoration: none; font-size: 20px; margin: 2px; cursor: pointer;}");
+            client.println(".button2 {background-color: #c20a0a;}");
+            client.println(".textbox {width: 80px; border: 1px solid #333; padding: 16px 20px 0px 24px; background-image: linear-gradient(180deg, #fff, #ddd 40%, #ccc);}");
+            client.println(".mytext {font-size: 16px; font-weight:bold; font-family:Arial ; text-align: justify;}");
+            client.println("#container {width: 100%; height: 100%; margin-left: 5px; margin-top: 20px; padding: 10px; display: -webkit-flex; -webkit-justify-content: center; display: flex; justify-content: center;} ");
+            
+            client.println("</style></head>");
+
+            
+            // Web Page Heading
+            client.println("<body><h1>  TURN TABLE</h1>");
+
+            // Display current state, and ON/OFF buttons for GPIO 5
+            client.println("<div id=\"container\">");
+            client.println("<p><div class=\"textbox mytext\">CALIBRATE </div>");
+            // If the calState is off, it displays the ON button
+            if (calState == "off") {
+              client.println("<a href=\"/5/on\"><button class=\"button\">OFF</button></a></p>");
+            } else {
+              client.println("<a href=\"/5/off\"><button class=\"button button2\">ON</button></a></p>");
+            }
+            client.println("</div>");
+            
+            // Display current state, and ON/OFF buttons for GPIO 0
+            client.println("<div id=\"container\">");
+            client.println("<p><div class=\"textbox mytext\">CW </div>");
+            // If the calState is off, it displays the ON button
+            if (cwState == "off") {
+              client.println("<a href=\"/0/on\"><button class=\"button\">OFF</button></a></p>");
+            } else {
+              client.println("<a href=\"/0/off\"><button class=\"button button2\">ON</button></a></p>");
+            }
+            client.println("</div>");
+            
+            // Display current state, and ON/OFF buttons for GPIO 2
+            client.println("<div id=\"container\">");
+            client.println("<p><div class=\"textbox mytext\">CCW </div>");
+            // If the relay2State is off, it displays the ON button
+            if (ccwState == "off") {
+              client.println("<a href=\"/2/on\"><button class=\"button\">OFF</button></a></p>");
+            } else {
+              client.println("<a href=\"/2/off\"><button class=\"button button2\">ON</button></a></p>");
+            }
+            client.println("</div>");
+
+            client.println("</body></html>");
+
+            // The HTTP response ends with another blank line
+            client.println();
+            // Break out of the while loop
+            break;
+          } else { // if you got a newline, then clear currentLine
+            currentLine = "";
+          }
+        } else if (c != '\r') {  // if you got anything else but a carriage return character,
+          currentLine += c;      // add it to the end of the currentLine
+        }
+      }
+    }
+    // Clear the header variable
+    header = "";
+    // Close the connection
+    client.stop();
+    Serial.println("Client disconnected.");
+    Serial.println("");
+  }
 }
