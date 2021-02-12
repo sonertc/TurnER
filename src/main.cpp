@@ -29,21 +29,16 @@ String ccwState = "off";
 
 // Assign output variables to GPIO pins
 const int cal = 02; // GPIO5 
-//const int relay2 = 02; // GPIO4 
 const int cw = 15; // GPIO4 
 const int ccw = 02; // GPIO4 
 
 void setup() {
   Serial.begin(115200);
   // Initialize the output variables as outputs
-  //pinMode(cal, OUTPUT);
-  //pinMode(relay2, OUTPUT);
   pinMode(cw, OUTPUT);
   pinMode(ccw, OUTPUT);
 
   // Set outputs to HIGH. relay active LOW
-  //digitalWrite(cal, HIGH);
-  //digitalWrite(relay2, HIGH);
   digitalWrite(cw, HIGH);
   digitalWrite(ccw, HIGH);
 
