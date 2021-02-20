@@ -10,7 +10,7 @@
 const char* ssid = "BASAK"; // Input your wifi network name
 const char* password = "09052011"; // Input your wifi password
 
-IPAddress ip(192, 168, 1, 110);
+IPAddress ip(192, 168, 1, 210);
 IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 
