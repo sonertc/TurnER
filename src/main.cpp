@@ -32,6 +32,7 @@ const int cal = 02; // GPIO5
 //const int relay2 = 02; // GPIO4 
 const int cw = 15; // GPIO4 
 const int ccw = 02; // GPIO4 
+const int button = 13;
 
 void setup() {
   Serial.begin(115200);
@@ -40,6 +41,7 @@ void setup() {
   //pinMode(relay2, OUTPUT);
   pinMode(cw, OUTPUT);
   pinMode(ccw, OUTPUT);
+  pinMode(button, INPUT_PULLUP);
 
   // Set outputs to HIGH. relay active LOW
   //digitalWrite(cal, HIGH);
