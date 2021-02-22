@@ -34,6 +34,10 @@ const int cw = 15; // GPIO4
 const int ccw = 02; // GPIO4 
 const int button = 13;
 
+int but_state = 0;
+
+
+
 void setup() {
   Serial.begin(115200);
   // Initialize the output variables as outputs
@@ -48,6 +52,7 @@ void setup() {
   //digitalWrite(relay2, HIGH);
   digitalWrite(cw, HIGH);
   digitalWrite(ccw, HIGH);
+  
 
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Connecting to ");
@@ -65,6 +70,8 @@ void setup() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   server.begin();
+
+  
 }
 
 void loop() {
@@ -90,7 +97,6 @@ void loop() {
             client.println();
 
             // turns the GPIOs on and off
-            
             
             if (header.indexOf("GET /0/on") >= 0) // CW ON
             {
@@ -131,7 +137,6 @@ void loop() {
               ccwState = "off";
               digitalWrite(cw, HIGH);
               
-             
             }
             else if (header.indexOf("GET /5/off") >= 0) { // CALIBRATE OFF
               Serial.println("GPIO 5 off");
@@ -139,6 +144,20 @@ void loop() {
               digitalWrite(ccw, HIGH);
             }
 
+            /*but_state = digitalRead(button);
+            if (but_state == HIGH) 
+                { // CALIBRATE Switch
+                  Serial.println("CaLibrated");
+                  calState = "off";
+                  digitalWrite(cw, HIGH);
+                  digitalWrite(ccw, HIGH);
+                }
+                else
+                {
+                  // turn LED off
+                  digitalWrite(ccw, LOW);
+                }
+              */
             // Display the HTML web page
             client.println("<!DOCTYPE html><html>");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
